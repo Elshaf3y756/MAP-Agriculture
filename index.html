@@ -5,14 +5,165 @@
   <title>خريطة الزراعات</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
+  <!-- Leaflet -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <!-- Locate Control -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.locatecontrol/dist/L.Control.Locate.min.css" />
+  <script src="https://unpkg.com/leaflet.locatecontrol/dist/L.Control.Locate.min.js"></script>
+
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
   <style>
     html, body, #map {
       height: 100%;
       margin: 0;
     }
 
+    #loading {
+      position: absolute;
+      top: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: white;
+      border: 1px solid gray;
+      padding: 5px 10px;
+      z-index: 1000;
+    }
+
+    #searchBox {
+      position: absolute;
+      top: 10px;
+      right: 60px;
+      z-index: 1000;
+      background: white;
+      padding: 5px;
+      border: 1px solid gray;
+      display: flex;
+      gap: 5px;
+      box-shadow: 0 0 5px rgba(0,0,0,0.2);
+    }
+
+    #searchBox select, #searchBox input {
+      padding: 3px;
+    }
+
+    #chartBox, #chartBoxLive {
+      position: absolute;
+      bottom: 10px;
+      background: white;
+      padding: 10px;
+      border: 1px solid gray;
+      border-radius: 10px;
+      z-index: 1000;
+      box-shadow: 0 0 5px rgba(0,0,0,0.2);
+      text-align: center;
+      width: 250px;
+      height: 250px;
+    }
+
+    #chartBox { right: 10px; }
+    #chartBoxLive { left: 10px; }
+
+    .chart-title {
+      font-weight: bold;
+      margin-bottom: 5px;
+      font-size: 16px;
+      color: darkgreen;
+    }
+
+    .leaflet-tooltip.custom-card {
+      background: white !important;
+      border-radius: 8px !important;
+      padding: 6px 8px !important;
+      border: 1px solid #ccc !important;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+      color: #333;
+      font-size: 12px;
+      line-height: 1.4;
+    }
+
+    .leaflet-popup-content-wrapper {
+      background: transparent;
+      box-shadow: none;
+      border: none;
+    }
+
+    .custom-popup {
+      position: relative;
+      background: white;
+      border-radius: 8px;
+      padding: 10px;
+      box-shadow: 0 6px 12px rgba(0,0,0,0.3);
+      animation: floatIn 0.4s ease-out;
+    }
+
+    .popup-content {
+      font-size: 13px;
+      color: #333;
+      line-height: 1.5;
+    }
+
+    .popup-arrow {
+      width: 0;
+      height: 0;
+      border-left: 10px solid transparent;
+      border-right: 10px solid transparent;
+      border-top: 10px solid white;
+      position: absolute;
+      bottom: -10px;
+      left: 50%;
+      transform: translateX(-50%);
+    }
+
+    @keyframes floatIn {
+      from {
+        transform: scale(0.8) translateY(10px);
+        opacity: 0;
+      }
+      to {
+        transform: scale(1) translateY(0);
+        opacity: 1;
+      }
+    }
+
+    /* ✅ Responsive */
+    @media (max-width: 768px) {
+      #searchBox {
+        flex-direction: column;
+        right: 10px;
+        left: 10px;
+      }
+
+      #chartBox, #chartBoxLive {
+        position: static;
+        margin: 10px auto;
+        width: 90%;
+        height: auto;
+      }
+
+      #chartBox canvas,
+      #chartBoxLive canvas {
+        width: 100% !important;
+        height: auto !important;
+      }
+
+      .chart-title {
+        font-size: 14px;
+      }
+
+      .leaflet-tooltip.custom-card {
+        font-size: 11px;
+      }
+
+      .popup-content {
+        font-size: 12px;
+      }
+    }
+
+    /* ✅ زر الوضع الليلي */
     #toggleTheme {
       position: absolute;
       top: 10px;
@@ -33,9 +184,24 @@
       transition: all 0.3s ease;
     }
 
+    #toggleTheme:hover {
+      background: #f0f0f0;
+    }
+
+    /* ✅ الوضع الليلي */
     body.dark {
       background-color: #121212;
       color: #f0f0f0;
+    }
+
+    body.dark #searchBox,
+    body.dark #chartBox,
+    body.dark #chartBoxLive,
+    body.dark .custom-popup,
+    body.dark .leaflet-tooltip.custom-card {
+      background: #1e1e1e !important;
+      color: #f0f0f0 !important;
+      border-color: #444 !important;
     }
 
     body.dark #toggleTheme {
@@ -46,64 +212,196 @@
 </head>
 <body>
 
-<div id="map"></div>
-<div id="toggleTheme" title="تبديل الوضع الليلي/النهاري">🌙</div>
+  <div id="searchBox">
+    <select id="fieldSelector">
+      <option value="Name_Tenanet">اسم المستأجر</option>
+      <option value="NUM_Place">رقم القطعة</option>
+      <option value="Contract_Area">مساحة العقد</option>
+      <option value="Surveying_Area">مساحة الرفع</option>
+    </select>
+    <input type="text" id="searchInput" placeholder="اكتب للبحث..." />
+  </div>
 
-<script>
-  // خرائط الأساس
-  var osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    maxZoom: 19,
-    attribution: '© OpenStreetMap'
-  });
+  <div id="chartBox"><div class="chart-title">بيان زراعات الدلتا</div><canvas id="pieChart"></canvas></div>
+  <div id="chartBoxLive"><div class="chart-title">المؤشرات الظاهرة</div><canvas id="pieChartLive"></canvas></div>
 
-  var lightMap = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
-    maxZoom: 19,
-    attribution: '© Carto Light'
-  });
+  <div id="loading">جاري تحميل البيانات...</div>
+  <div id="map"></div>
+  <div id="toggleTheme" title="تبديل الوضع الليلي/النهاري">🌙</div>
 
-  var darkMap = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-    maxZoom: 19,
-    attribution: '© Carto Dark'
-  });
+  <script>
+    var map = L.map('map').setView([31.05, 31.49], 14);
+    var osm = L.tileLayer('https://{s}.tile.openstreetmap.de/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
 
-  var satellite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-    maxZoom: 19,
-    attribution: '© Esri Satellite'
-  });
+    let agricultureLayer;
+    let pieChart, pieLiveChart;
 
-  // إنشاء الخريطة بخريطة مبدئية
-  var map = L.map('map', {
-    center: [31.05, 31.49],
-    zoom: 14,
-    layers: [lightMap]  // المبدئية
-  });
+    fetch('agriculture3.geojson')
+      .then(response => response.json())
+      .then(data => {
+        document.getElementById("loading").style.display = "none";
 
-  // أداة اختيار الخرائط
-  var baseMaps = {
-    "خريطة OSM": osm,
-    "خريطة فاتحة": lightMap,
-    "خريطة داكنة": darkMap,
-    "قمر صناعي": satellite
-  };
-  L.control.layers(baseMaps, null, { position: 'topright' }).addTo(map);
+        agricultureLayer = L.geoJSON(data, {
+          onEachFeature: function (feature, layer) {
+            const props = feature.properties;
 
-  // زر التبديل بين النهاري والليلي
-  document.getElementById('toggleTheme').addEventListener('click', function () {
-    const isDark = document.body.classList.toggle('dark');
-    this.textContent = isDark ? '☀️' : '🌙';
+            const cardHTML = `
+              <div>
+                <div><b>المستأجر:</b> ${props.Name_Tenanet || 'غير معروف'}</div>
+                <div><b>رقم القطعة:</b> ${props.NUM_Place || '-'}</div>
+                <div><b>العقد:</b> ${props.Contract_Area || '-'} ف</div>
+                <div><b>الرفع:</b> ${props.Surveying_Area ? parseFloat(props.Surveying_Area).toFixed(2) : '-'} ف</div>
+              </div>
+            `;
 
-    // الحصول على الطبقة الحالية (BaseMap فقط)
-    const currentBase = Object.values(map._layers).find(l => map.hasLayer(l) && l instanceof L.TileLayer);
+            layer.bindTooltip(cardHTML, {
+              permanent: true,
+              direction: "top",
+              className: "custom-card",
+              opacity: 0.95
+            });
+            layer._customCard = layer.getTooltip();
 
-    // تغيير الخريطة حسب الوضع
-    if (isDark && currentBase !== darkMap) {
-      map.removeLayer(currentBase);
-      darkMap.addTo(map);
-    } else if (!isDark && currentBase !== lightMap) {
-      map.removeLayer(currentBase);
-      lightMap.addTo(map);
-    }
-  });
-</script>
+            const popupHTML = `
+              <div class="custom-popup">
+                <div class="popup-content">
+                  <div><b>المستأجر:</b> ${props.Name_Tenanet || 'غير معروف'}</div>
+                  <div><b>رقم القطعة:</b> ${props.NUM_Place || '-'}</div>
+                  <div><b>العقد:</b> ${props.Contract_Area || '-'} ف</div>
+                  <div><b>الرفع:</b> ${props.Surveying_Area ? parseFloat(props.Surveying_Area).toFixed(2) : '-'} ف</div>
+                </div>
+                <div class="popup-arrow"></div>
+              </div>
+            `;
+            layer.bindPopup(popupHTML);
+          },
+          style: { color: 'red', weight: 3 }
+        }).addTo(map);
+
+        map.fitBounds(agricultureLayer.getBounds());
+
+        let tenantsSet = new Set();
+        let totalContract = 0, totalSurvey = 0;
+        data.features.forEach(f => {
+          const p = f.properties;
+          if (p.Name_Tenanet) tenantsSet.add(p.Name_Tenanet.trim());
+          if (!isNaN(parseFloat(p.Contract_Area))) totalContract += parseFloat(p.Contract_Area);
+          if (!isNaN(parseFloat(p.Surveying_Area))) totalSurvey += parseFloat(p.Surveying_Area);
+        });
+
+        pieChart = new Chart(document.getElementById('pieChart'), {
+          type: 'pie',
+          data: {
+            labels: ['المستأجرين', 'عدد القطع', 'العقود (ف)', 'الرفع (ف)'],
+            datasets: [{
+              data: [tenantsSet.size, data.features.length, totalContract.toFixed(2), totalSurvey.toFixed(2)],
+              backgroundColor: ['#4caf50', '#2196f3', '#ff9800', '#e91e63'],
+              borderColor: '#fff',
+              borderWidth: 2
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { position: 'bottom' } }
+          }
+        });
+
+        function updateLiveChart() {
+          let bounds = map.getBounds();
+          let tenants = new Set();
+          let plots = 0, contractArea = 0, surveyArea = 0;
+
+          agricultureLayer.eachLayer(layer => {
+            if (bounds.intersects(layer.getBounds())) {
+              const p = layer.feature.properties;
+              plots++;
+              if (p.Name_Tenanet) tenants.add(p.Name_Tenanet.trim());
+              if (!isNaN(parseFloat(p.Contract_Area))) contractArea += parseFloat(p.Contract_Area);
+              if (!isNaN(parseFloat(p.Surveying_Area))) surveyArea += parseFloat(p.Surveying_Area);
+            }
+          });
+
+          const dataSet = [tenants.size, plots, contractArea.toFixed(2), surveyArea.toFixed(2)];
+
+          if (pieLiveChart) {
+            pieLiveChart.data.datasets[0].data = dataSet;
+            pieLiveChart.update();
+          } else {
+            pieLiveChart = new Chart(document.getElementById('pieChartLive'), {
+              type: 'pie',
+              data: {
+                labels: ['المستأجرين', 'عدد القطع', 'العقود (ف)', 'الرفع (ف)'],
+                datasets: [{
+                  data: dataSet,
+                  backgroundColor: ['#2ecc71', '#3498db', '#f1c40f', '#e74c3c'],
+                  borderColor: '#fff',
+                  borderWidth: 2
+                }]
+              },
+              options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { position: 'bottom' } }
+              }
+            });
+          }
+        }
+
+        updateLiveChart();
+        map.on('moveend', updateLiveChart);
+
+        map.on('zoomend', function () {
+          const zoom = map.getZoom();
+          agricultureLayer.eachLayer(layer => {
+            if (layer._customCard) {
+              if (zoom >= 15) map.openTooltip(layer._customCard);
+              else map.closeTooltip(layer._customCard);
+            }
+          });
+        });
+
+        document.getElementById('searchInput').addEventListener('input', applySearch);
+        document.getElementById('fieldSelector').addEventListener('change', applySearch);
+
+        function applySearch() {
+          const query = document.getElementById('searchInput').value.trim().toLowerCase();
+          const field = document.getElementById('fieldSelector').value;
+          const matches = [];
+
+          agricultureLayer.eachLayer(layer => {
+            const value = (layer.feature.properties[field] + '').toLowerCase();
+            if (value.includes(query)) {
+              layer.setStyle({ color: 'blue', weight: 4 });
+              matches.push(layer);
+            } else {
+              layer.setStyle({ color: 'gray', weight: 1 });
+            }
+          });
+
+          if (matches.length > 0) map.fitBounds(new L.featureGroup(matches).getBounds());
+        }
+      });
+
+    L.control.locate({ position: 'topright', strings: { title: "اظهار موقعي" }, keepCurrentZoomLevel: true }).addTo(map);
+
+    var zoomHome = L.control({ position: 'topright' });
+    zoomHome.onAdd = function () {
+      var div = L.DomUtil.create('div', 'leaflet-control-zoom-home');
+      div.innerHTML = '↺';
+      div.title = 'عرض كل الزراعات';
+      div.onclick = function () {
+        if (agricultureLayer) map.fitBounds(agricultureLayer.getBounds());
+      };
+      return div;
+    };
+    zoomHome.addTo(map);
+
+    // ✅ زر تغيير الوضع
+    document.getElementById('toggleTheme').addEventListener('click', function () {
+      document.body.classList.toggle('dark');
+      this.textContent = document.body.classList.contains('dark') ? '☀️' : '🌙';
+    });
+  </script>
 </body>
 </html>
