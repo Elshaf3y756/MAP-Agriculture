@@ -129,7 +129,7 @@
       }
     }
 
-    /* ✅ Responsive */
+    /* ✅ Responsive Design */
     @media (max-width: 768px) {
       #searchBox {
         flex-direction: column;
@@ -162,52 +162,6 @@
         font-size: 12px;
       }
     }
-
-    /* ✅ زر الوضع الليلي */
-    #toggleTheme {
-      position: absolute;
-      top: 10px;
-      left: 10px;
-      background: white;
-      color: black;
-      border: 1px solid #ccc;
-      border-radius: 50%;
-      width: 40px;
-      height: 40px;
-      font-size: 20px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      cursor: pointer;
-      z-index: 1001;
-      box-shadow: 0 2px 6px rgba(0,0,0,0.3);
-      transition: all 0.3s ease;
-    }
-
-    #toggleTheme:hover {
-      background: #f0f0f0;
-    }
-
-    /* ✅ الوضع الليلي */
-    body.dark {
-      background-color: #121212;
-      color: #f0f0f0;
-    }
-
-    body.dark #searchBox,
-    body.dark #chartBox,
-    body.dark #chartBoxLive,
-    body.dark .custom-popup,
-    body.dark .leaflet-tooltip.custom-card {
-      background: #1e1e1e !important;
-      color: #f0f0f0 !important;
-      border-color: #444 !important;
-    }
-
-    body.dark #toggleTheme {
-      background: #333;
-      color: #fff;
-    }
   </style>
 </head>
 <body>
@@ -227,7 +181,6 @@
 
   <div id="loading">جاري تحميل البيانات...</div>
   <div id="map"></div>
-  <div id="toggleTheme" title="تبديل الوضع الليلي/النهاري">🌙</div>
 
   <script>
     var map = L.map('map').setView([31.05, 31.49], 14);
