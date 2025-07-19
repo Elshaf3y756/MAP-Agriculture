@@ -36,7 +36,7 @@
     #searchBox {
       position: absolute;
       top: 10px;
-      right: 60px;
+      right: 10px;
       z-index: 1000;
       background: white;
       padding: 5px;
@@ -44,17 +44,17 @@
       display: flex;
       gap: 5px;
       box-shadow: 0 0 5px rgba(0,0,0,0.2);
+      flex-wrap: wrap;
     }
 
     #searchBox select, #searchBox input {
       padding: 3px;
+      font-size: 14px;
     }
 
     #chartBox, #chartBoxLive {
       position: absolute;
       bottom: 10px;
-      width: 180px;
-      height: auto;
       background: white;
       padding: 10px;
       border: 1px solid gray;
@@ -62,15 +62,12 @@
       z-index: 1000;
       box-shadow: 0 0 5px rgba(0,0,0,0.2);
       text-align: center;
+      width: 200px;
+      height: 200px;
     }
 
-    #chartBox {
-      right: 10px;
-    }
-
-    #chartBoxLive {
-      left: 10px;
-    }
+    #chartBox { right: 10px; }
+    #chartBoxLive { left: 10px; }
 
     .chart-title {
       font-weight: bold;
@@ -137,46 +134,30 @@
     @media (max-width: 768px) {
       #searchBox {
         flex-direction: column;
-        right: 10px;
         left: 10px;
+        right: 10px;
+        gap: 3px;
+        padding: 4px;
+      }
+
+      #searchBox select, #searchBox input {
+        font-size: 12px;
+        padding: 2px;
       }
 
       #chartBox, #chartBoxLive {
-        width: 45%;
+        width: 150px;
+        height: 150px;
         padding: 8px;
-        bottom: 10px;
-      }
-
-      #chartBox {
-        right: 5px;
-      }
-
-      #chartBoxLive {
-        left: 5px;
       }
 
       .chart-title {
-        font-size: 14px;
-      }
-
-      #chartBox canvas,
-      #chartBoxLive canvas {
-        width: 100% !important;
-        height: auto !important;
-      }
-
-      .leaflet-tooltip.custom-card {
-        font-size: 11px;
-      }
-
-      .popup-content {
-        font-size: 12px;
+        font-size: 13px;
       }
     }
   </style>
 </head>
 <body>
-
   <div id="searchBox">
     <select id="fieldSelector">
       <option value="Name_Tenanet">اسم المستأجر</option>
@@ -192,166 +173,5 @@
 
   <div id="loading">جاري تحميل البيانات...</div>
   <div id="map"></div>
-
-  <script>
-    var map = L.map('map').setView([31.05, 31.49], 14);
-    var osm = L.tileLayer('https://{s}.tile.openstreetmap.de/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
-
-    let agricultureLayer;
-    let pieChart, pieLiveChart;
-
-    fetch('agriculture3.geojson')
-      .then(response => response.json())
-      .then(data => {
-        document.getElementById("loading").style.display = "none";
-
-        agricultureLayer = L.geoJSON(data, {
-          onEachFeature: function (feature, layer) {
-            const props = feature.properties;
-            const cardHTML = `
-              <div>
-                <div><b>المستأجر:</b> ${props.Name_Tenanet || 'غير معروف'}</div>
-                <div><b>رقم القطعة:</b> ${props.NUM_Place || '-'}</div>
-                <div><b>العقد:</b> ${props.Contract_Area || '-'} ف</div>
-                <div><b>الرفع:</b> ${props.Surveying_Area ? parseFloat(props.Surveying_Area).toFixed(2) : '-'} ف</div>
-              </div>`;
-
-            layer.bindTooltip(cardHTML, {
-              permanent: true,
-              direction: "top",
-              className: "custom-card",
-              opacity: 0.95
-            });
-            layer._customCard = layer.getTooltip();
-
-            const popupHTML = `
-              <div class="custom-popup">
-                <div class="popup-content">
-                  <div><b>المستأجر:</b> ${props.Name_Tenanet || 'غير معروف'}</div>
-                  <div><b>رقم القطعة:</b> ${props.NUM_Place || '-'}</div>
-                  <div><b>العقد:</b> ${props.Contract_Area || '-'} ف</div>
-                  <div><b>الرفع:</b> ${props.Surveying_Area ? parseFloat(props.Surveying_Area).toFixed(2) : '-'} ف</div>
-                </div>
-                <div class="popup-arrow"></div>
-              </div>`;
-            layer.bindPopup(popupHTML);
-          },
-          style: { color: 'red', weight: 3 }
-        }).addTo(map);
-
-        map.fitBounds(agricultureLayer.getBounds());
-
-        let tenantsSet = new Set();
-        let totalContract = 0, totalSurvey = 0;
-        data.features.forEach(f => {
-          const p = f.properties;
-          if (p.Name_Tenanet) tenantsSet.add(p.Name_Tenanet.trim());
-          if (!isNaN(parseFloat(p.Contract_Area))) totalContract += parseFloat(p.Contract_Area);
-          if (!isNaN(parseFloat(p.Surveying_Area))) totalSurvey += parseFloat(p.Surveying_Area);
-        });
-
-        pieChart = new Chart(document.getElementById('pieChart'), {
-          type: 'pie',
-          data: {
-            labels: ['المستأجرين', 'عدد القطع', 'العقود (ف)', 'الرفع (ف)'],
-            datasets: [{
-              data: [tenantsSet.size, data.features.length, totalContract.toFixed(2), totalSurvey.toFixed(2)],
-              backgroundColor: ['#4caf50', '#2196f3', '#ff9800', '#e91e63'],
-              borderColor: '#fff',
-              borderWidth: 2
-            }]
-          },
-          options: { responsive: true, plugins: { legend: { position: 'bottom' } } }
-        });
-
-        function updateLiveChart() {
-          let bounds = map.getBounds();
-          let tenants = new Set();
-          let plots = 0, contractArea = 0, surveyArea = 0;
-
-          agricultureLayer.eachLayer(layer => {
-            if (bounds.intersects(layer.getBounds())) {
-              const p = layer.feature.properties;
-              plots++;
-              if (p.Name_Tenanet) tenants.add(p.Name_Tenanet.trim());
-              if (!isNaN(parseFloat(p.Contract_Area))) contractArea += parseFloat(p.Contract_Area);
-              if (!isNaN(parseFloat(p.Surveying_Area))) surveyArea += parseFloat(p.Surveying_Area);
-            }
-          });
-
-          const dataSet = [tenants.size, plots, contractArea.toFixed(2), surveyArea.toFixed(2)];
-
-          if (pieLiveChart) {
-            pieLiveChart.data.datasets[0].data = dataSet;
-            pieLiveChart.update();
-          } else {
-            pieLiveChart = new Chart(document.getElementById('pieChartLive'), {
-              type: 'pie',
-              data: {
-                labels: ['المستأجرين', 'عدد القطع', 'العقود (ف)', 'الرفع (ف)'],
-                datasets: [{
-                  data: dataSet,
-                  backgroundColor: ['#2ecc71', '#3498db', '#f1c40f', '#e74c3c'],
-                  borderColor: '#fff',
-                  borderWidth: 2
-                }]
-              },
-              options: {
-                responsive: true,
-                plugins: { legend: { position: 'bottom' } }
-              }
-            });
-          }
-        }
-
-        updateLiveChart();
-        map.on('moveend', updateLiveChart);
-
-        map.on('zoomend', function () {
-          const zoom = map.getZoom();
-          agricultureLayer.eachLayer(layer => {
-            if (layer._customCard) {
-              if (zoom >= 15) map.openTooltip(layer._customCard);
-              else map.closeTooltip(layer._customCard);
-            }
-          });
-        });
-
-        document.getElementById('searchInput').addEventListener('input', applySearch);
-        document.getElementById('fieldSelector').addEventListener('change', applySearch);
-
-        function applySearch() {
-          const query = document.getElementById('searchInput').value.trim().toLowerCase();
-          const field = document.getElementById('fieldSelector').value;
-          const matches = [];
-
-          agricultureLayer.eachLayer(layer => {
-            const value = (layer.feature.properties[field] + '').toLowerCase();
-            if (value.includes(query)) {
-              layer.setStyle({ color: 'blue', weight: 4 });
-              matches.push(layer);
-            } else {
-              layer.setStyle({ color: 'gray', weight: 1 });
-            }
-          });
-
-          if (matches.length > 0) map.fitBounds(new L.featureGroup(matches).getBounds());
-        }
-      });
-
-    L.control.locate({ position: 'topright', strings: { title: "اظهار موقعي" }, keepCurrentZoomLevel: true }).addTo(map);
-
-    var zoomHome = L.control({ position: 'topright' });
-    zoomHome.onAdd = function () {
-      var div = L.DomUtil.create('div', 'leaflet-control-zoom-home');
-      div.innerHTML = '↺';
-      div.title = 'عرض كل الزراعات';
-      div.onclick = function () {
-        if (agricultureLayer) map.fitBounds(agricultureLayer.getBounds());
-      };
-      return div;
-    };
-    zoomHome.addTo(map);
-  </script>
 </body>
 </html>
