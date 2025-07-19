@@ -5,7 +5,7 @@
   <title>خريطة الزراعات</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-  <!-- Leaflet CSS + JS -->
+  <!-- Leaflet -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
@@ -17,15 +17,9 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
   <style>
-    html, body {
+    html, body, #map {
       height: 100%;
       margin: 0;
-      padding: 0;
-    }
-
-    #map {
-      height: 100%;
-      width: 100%;
     }
 
     #loading {
@@ -42,7 +36,7 @@
     #searchBox {
       position: absolute;
       top: 10px;
-      right: 10px;
+      right: 60px;
       z-index: 1000;
       background: white;
       padding: 5px;
@@ -50,7 +44,6 @@
       display: flex;
       gap: 5px;
       box-shadow: 0 0 5px rgba(0,0,0,0.2);
-      flex-wrap: wrap;
     }
 
     #searchBox select, #searchBox input {
@@ -60,7 +53,8 @@
     #chartBox, #chartBoxLive {
       position: absolute;
       bottom: 10px;
-      width: 250px;
+      width: 180px;
+      height: auto;
       background: white;
       padding: 10px;
       border: 1px solid gray;
@@ -141,13 +135,34 @@
     }
 
     @media (max-width: 768px) {
+      #searchBox {
+        flex-direction: column;
+        right: 10px;
+        left: 10px;
+      }
+
       #chartBox, #chartBoxLive {
         width: 45%;
         padding: 8px;
+        bottom: 10px;
+      }
+
+      #chartBox {
+        right: 5px;
+      }
+
+      #chartBoxLive {
+        left: 5px;
       }
 
       .chart-title {
         font-size: 14px;
+      }
+
+      #chartBox canvas,
+      #chartBoxLive canvas {
+        width: 100% !important;
+        height: auto !important;
       }
 
       .leaflet-tooltip.custom-card {
@@ -156,13 +171,6 @@
 
       .popup-content {
         font-size: 12px;
-      }
-
-      #searchBox {
-        right: 5px;
-        left: 5px;
-        flex-direction: column;
-        align-items: stretch;
       }
     }
   </style>
@@ -199,17 +207,16 @@
 
         agricultureLayer = L.geoJSON(data, {
           onEachFeature: function (feature, layer) {
-            const p = feature.properties;
-
-            const tooltipHTML = `
+            const props = feature.properties;
+            const cardHTML = `
               <div>
-                <div><b>المستأجر:</b> ${p.Name_Tenanet || 'غير معروف'}</div>
-                <div><b>رقم القطعة:</b> ${p.NUM_Place || '-'}</div>
-                <div><b>العقد:</b> ${p.Contract_Area || '-'} ف</div>
-                <div><b>الرفع:</b> ${p.Surveying_Area ? parseFloat(p.Surveying_Area).toFixed(2) : '-'} ف</div>
-              </div>
-            `;
-            layer.bindTooltip(tooltipHTML, {
+                <div><b>المستأجر:</b> ${props.Name_Tenanet || 'غير معروف'}</div>
+                <div><b>رقم القطعة:</b> ${props.NUM_Place || '-'}</div>
+                <div><b>العقد:</b> ${props.Contract_Area || '-'} ف</div>
+                <div><b>الرفع:</b> ${props.Surveying_Area ? parseFloat(props.Surveying_Area).toFixed(2) : '-'} ف</div>
+              </div>`;
+
+            layer.bindTooltip(cardHTML, {
               permanent: true,
               direction: "top",
               className: "custom-card",
@@ -220,14 +227,13 @@
             const popupHTML = `
               <div class="custom-popup">
                 <div class="popup-content">
-                  <div><b>المستأجر:</b> ${p.Name_Tenanet || 'غير معروف'}</div>
-                  <div><b>رقم القطعة:</b> ${p.NUM_Place || '-'}</div>
-                  <div><b>العقد:</b> ${p.Contract_Area || '-'} ف</div>
-                  <div><b>الرفع:</b> ${p.Surveying_Area ? parseFloat(p.Surveying_Area).toFixed(2) : '-'} ف</div>
+                  <div><b>المستأجر:</b> ${props.Name_Tenanet || 'غير معروف'}</div>
+                  <div><b>رقم القطعة:</b> ${props.NUM_Place || '-'}</div>
+                  <div><b>العقد:</b> ${props.Contract_Area || '-'} ف</div>
+                  <div><b>الرفع:</b> ${props.Surveying_Area ? parseFloat(props.Surveying_Area).toFixed(2) : '-'} ف</div>
                 </div>
                 <div class="popup-arrow"></div>
-              </div>
-            `;
+              </div>`;
             layer.bindPopup(popupHTML);
           },
           style: { color: 'red', weight: 3 }
@@ -255,11 +261,7 @@
               borderWidth: 2
             }]
           },
-          options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: { legend: { position: 'bottom' } }
-          }
+          options: { responsive: true, plugins: { legend: { position: 'bottom' } } }
         });
 
         function updateLiveChart() {
@@ -296,7 +298,6 @@
               },
               options: {
                 responsive: true,
-                maintainAspectRatio: false,
                 plugins: { legend: { position: 'bottom' } }
               }
             });
@@ -306,7 +307,7 @@
         updateLiveChart();
         map.on('moveend', updateLiveChart);
 
-        map.on('zoomend', () => {
+        map.on('zoomend', function () {
           const zoom = map.getZoom();
           agricultureLayer.eachLayer(layer => {
             if (layer._customCard) {
@@ -338,20 +339,13 @@
         }
       });
 
-    L.control.locate({
-      position: 'topright',
-      strings: { title: "اظهار موقعي" },
-      keepCurrentZoomLevel: true
-    }).addTo(map);
+    L.control.locate({ position: 'topright', strings: { title: "اظهار موقعي" }, keepCurrentZoomLevel: true }).addTo(map);
 
     var zoomHome = L.control({ position: 'topright' });
     zoomHome.onAdd = function () {
       var div = L.DomUtil.create('div', 'leaflet-control-zoom-home');
       div.innerHTML = '↺';
       div.title = 'عرض كل الزراعات';
-      div.style.cursor = 'pointer';
-      div.style.background = 'white';
-      div.style.padding = '5px';
       div.onclick = function () {
         if (agricultureLayer) map.fitBounds(agricultureLayer.getBounds());
       };
