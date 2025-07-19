@@ -23,10 +23,7 @@
     html, body, #map {
       height: 100%;
       margin: 0;
-    }
-
-    #map {
-      z-index: 0;
+      padding: 0;
     }
 
     #loading {
@@ -37,14 +34,14 @@
       background: white;
       border: 1px solid gray;
       padding: 5px 10px;
-      z-index: 1050;
+      z-index: 1000;
     }
 
     #searchBox {
       position: absolute;
       top: 10px;
       right: 10px;
-      z-index: 1050;
+      z-index: 1000;
       background: white;
       padding: 5px;
       border: 1px solid gray;
@@ -56,7 +53,6 @@
 
     #searchBox select, #searchBox input {
       padding: 3px;
-      font-size: 14px;
     }
 
     #chartBox, #chartBoxLive {
@@ -70,11 +66,21 @@
       box-shadow: 0 0 5px rgba(0,0,0,0.2);
       text-align: center;
       width: 200px;
-      height: 200px;
+      height: auto;
+      box-sizing: border-box;
+      overflow: visible;
     }
 
     #chartBox { right: 10px; }
     #chartBoxLive { left: 10px; }
+
+    #chartBox canvas,
+    #chartBoxLive canvas {
+      width: 100% !important;
+      height: auto !important;
+      display: block;
+      margin: auto;
+    }
 
     .chart-title {
       font-weight: bold;
@@ -135,78 +141,65 @@
     @media (max-width: 768px) {
       #searchBox {
         flex-direction: column;
-        left: 10px;
         right: 10px;
-        gap: 3px;
-        padding: 4px;
-      }
-
-      #searchBox select, #searchBox input {
-        font-size: 12px;
-        padding: 2px;
+        left: 10px;
       }
 
       #chartBox, #chartBoxLive {
-        width: 140px;
-        height: 140px;
-        padding: 8px;
+        width: 45%;
+        height: auto;
       }
 
-      .chart-title { font-size: 13px; }
+      #chartBox { right: 5px; bottom: 5px; }
+      #chartBoxLive { left: 5px; bottom: 5px; }
 
+      .chart-title { font-size: 14px; }
       .leaflet-tooltip.custom-card { font-size: 11px; }
-
       .popup-content { font-size: 12px; }
+
+      #searchBox select, #searchBox input {
+        font-size: 12px;
+      }
     }
   </style>
 </head>
 <body>
-  <div id="searchBox" class="rounded">
-    <select id="fieldSelector" class="form-select form-select-sm">
+
+  <div id="searchBox">
+    <select id="fieldSelector">
       <option value="Name_Tenanet">اسم المستأجر</option>
       <option value="NUM_Place">رقم القطعة</option>
       <option value="Contract_Area">مساحة العقد</option>
       <option value="Surveying_Area">مساحة الرفع</option>
     </select>
-    <input type="text" id="searchInput" class="form-control form-control-sm" placeholder="اكتب للبحث..." />
+    <input type="text" id="searchInput" placeholder="اكتب للبحث..." />
   </div>
 
-  <div id="chartBox" class="shadow rounded">
-    <div class="chart-title">بيان زراعات الدلتا</div>
-    <canvas id="pieChart"></canvas>
-  </div>
-
-  <div id="chartBoxLive" class="shadow rounded">
-    <div class="chart-title">المؤشرات الظاهرة</div>
-    <canvas id="pieChartLive"></canvas>
-  </div>
+  <div id="chartBox"><div class="chart-title">بيان زراعات الدلتا</div><canvas id="pieChart"></canvas></div>
+  <div id="chartBoxLive"><div class="chart-title">المؤشرات الظاهرة</div><canvas id="pieChartLive"></canvas></div>
 
   <div id="loading">جاري تحميل البيانات...</div>
   <div id="map"></div>
 
   <script>
     var map = L.map('map').setView([31.05, 31.49], 14);
-    var osm = L.tileLayer('https://{s}.tile.openstreetmap.de/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
+    L.tileLayer('https://{s}.tile.openstreetmap.de/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
 
-    let agricultureLayer, pieChart, pieLiveChart;
+    let agricultureLayer;
 
     fetch('agriculture3.geojson')
-      .then(res => res.json())
+      .then(response => response.json())
       .then(data => {
         document.getElementById("loading").style.display = "none";
 
         agricultureLayer = L.geoJSON(data, {
-          onEachFeature: (feature, layer) => {
+          onEachFeature: function (feature, layer) {
             const props = feature.properties;
+            const cardHTML = `<div><b>المستأجر:</b> ${props.Name_Tenanet || 'غير معروف'}<br>
+              <b>رقم القطعة:</b> ${props.NUM_Place || '-'}<br>
+              <b>العقد:</b> ${props.Contract_Area || '-'} ف<br>
+              <b>الرفع:</b> ${props.Surveying_Area ? parseFloat(props.Surveying_Area).toFixed(2) : '-'} ف</div>`;
 
-            const cardHTML = `
-              <div>
-                <div><b>المستأجر:</b> ${props.Name_Tenanet || 'غير معروف'}</div>
-                <div><b>رقم القطعة:</b> ${props.NUM_Place || '-'}</div>
-                <div><b>العقد:</b> ${props.Contract_Area || '-'} ف</div>
-                <div><b>الرفع:</b> ${props.Surveying_Area ? parseFloat(props.Surveying_Area).toFixed(2) : '-'} ف</div>
-              </div>
-            `;
             layer.bindTooltip(cardHTML, {
               permanent: true,
               direction: "top",
@@ -215,17 +208,7 @@
             });
             layer._customCard = layer.getTooltip();
 
-            const popupHTML = `
-              <div class="custom-popup">
-                <div class="popup-content">
-                  <div><b>المستأجر:</b> ${props.Name_Tenanet || 'غير معروف'}</div>
-                  <div><b>رقم القطعة:</b> ${props.NUM_Place || '-'}</div>
-                  <div><b>العقد:</b> ${props.Contract_Area || '-'} ف</div>
-                  <div><b>الرفع:</b> ${props.Surveying_Area ? parseFloat(props.Surveying_Area).toFixed(2) : '-'} ف</div>
-                </div>
-                <div class="popup-arrow"></div>
-              </div>
-            `;
+            const popupHTML = `<div class="custom-popup"><div class="popup-content">${cardHTML}</div><div class="popup-arrow"></div></div>`;
             layer.bindPopup(popupHTML);
           },
           style: { color: 'red', weight: 3 }
@@ -242,22 +225,17 @@
           if (!isNaN(parseFloat(p.Surveying_Area))) totalSurvey += parseFloat(p.Surveying_Area);
         });
 
-        pieChart = new Chart(document.getElementById('pieChart'), {
+        new Chart(document.getElementById('pieChart'), {
           type: 'pie',
           data: {
             labels: ['المستأجرين', 'عدد القطع', 'العقود (ف)', 'الرفع (ف)'],
             datasets: [{
               data: [tenantsSet.size, data.features.length, totalContract.toFixed(2), totalSurvey.toFixed(2)],
               backgroundColor: ['#4caf50', '#2196f3', '#ff9800', '#e91e63'],
-              borderColor: '#fff',
-              borderWidth: 2
+              borderColor: '#fff', borderWidth: 2
             }]
           },
-          options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: { legend: { position: 'bottom' } }
-          }
+          options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } }
         });
 
         function updateLiveChart() {
@@ -277,7 +255,7 @@
 
           const dataSet = [tenants.size, plots, contractArea.toFixed(2), surveyArea.toFixed(2)];
 
-          if (pieLiveChart) {
+          if (window.pieLiveChart) {
             pieLiveChart.data.datasets[0].data = dataSet;
             pieLiveChart.update();
           } else {
@@ -288,8 +266,7 @@
                 datasets: [{
                   data: dataSet,
                   backgroundColor: ['#2ecc71', '#3498db', '#f1c40f', '#e74c3c'],
-                  borderColor: '#fff',
-                  borderWidth: 2
+                  borderColor: '#fff', borderWidth: 2
                 }]
               },
               options: {
@@ -336,19 +313,13 @@
         }
       });
 
-    // أدوات الموقع
     L.control.locate({ position: 'topright', strings: { title: "اظهار موقعي" }, keepCurrentZoomLevel: true }).addTo(map);
 
-    // زر إعادة التوسيط
     var zoomHome = L.control({ position: 'topright' });
     zoomHome.onAdd = function () {
       var div = L.DomUtil.create('div', 'leaflet-control-zoom-home');
       div.innerHTML = '↺';
       div.title = 'عرض كل الزراعات';
-      div.style.cursor = 'pointer';
-      div.style.background = 'white';
-      div.style.border = '1px solid gray';
-      div.style.padding = '5px';
       div.onclick = function () {
         if (agricultureLayer) map.fitBounds(agricultureLayer.getBounds());
       };
