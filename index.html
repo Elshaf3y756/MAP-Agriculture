@@ -17,9 +17,17 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
   <style>
-    html, body, #map {
+    html, body {
       height: 100%;
       margin: 0;
+      display: flex;
+      flex-direction: column;
+      font-family: sans-serif;
+    }
+
+    #map {
+      flex: 1;
+      min-height: 300px;
     }
 
     #loading {
@@ -51,8 +59,6 @@
     }
 
     #chartBox, #chartBoxLive {
-      position: absolute;
-      bottom: 10px;
       background: white;
       padding: 10px;
       border: 1px solid gray;
@@ -62,10 +68,8 @@
       text-align: center;
       width: 250px;
       height: 250px;
+      margin: 10px auto;
     }
-
-    #chartBox { right: 10px; }
-    #chartBoxLive { left: 10px; }
 
     .chart-title {
       font-weight: bold;
@@ -129,18 +133,16 @@
       }
     }
 
-    /* ✅ Responsive Design */
     @media (max-width: 768px) {
       #searchBox {
         flex-direction: column;
         right: 10px;
         left: 10px;
+        width: calc(100% - 20px);
       }
 
       #chartBox, #chartBoxLive {
-        position: static;
-        margin: 10px auto;
-        width: 90%;
+        width: 95%;
         height: auto;
       }
 
@@ -176,11 +178,11 @@
     <input type="text" id="searchInput" placeholder="اكتب للبحث..." />
   </div>
 
-  <div id="chartBox"><div class="chart-title">بيان زراعات الدلتا</div><canvas id="pieChart"></canvas></div>
-  <div id="chartBoxLive"><div class="chart-title">المؤشرات الظاهرة</div><canvas id="pieChartLive"></canvas></div>
-
   <div id="loading">جاري تحميل البيانات...</div>
   <div id="map"></div>
+
+  <div id="chartBox"><div class="chart-title">بيان زراعات الدلتا</div><canvas id="pieChart"></canvas></div>
+  <div id="chartBoxLive"><div class="chart-title">المؤشرات الظاهرة</div><canvas id="pieChartLive"></canvas></div>
 
   <script>
     var map = L.map('map').setView([31.05, 31.49], 14);
